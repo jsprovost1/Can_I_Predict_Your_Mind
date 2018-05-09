@@ -1,0 +1,884 @@
+---
+title: "Can You Predict Your Next Word? Maybe I Can!"
+author: "Jean-Sebastien Provost"
+date: "3/31/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r message=FALSE}
+setwd("/Users/jean-sebastienprovost/Dropbox/capstone/model/")
+```
+
+#INTRODUCTION
+### A question that has puzzled mankind is whether we will ever be able to read someone else's mind. Even though this question has a lot of ethical considerations that needs to be addressed, it is still an interesting question on a scientific point of view. Indeed, this ability could be very benificial for patients in coma, for whom it has been shown that they are still reactive to their environment. But on a more simplistic way, can we have a conversation with a friend and predict what is the next thing that will be said? Our personality contributes to how we are going the exchange with soemone. Furthermore, we may have a specific style of communication that is proper to us favoring some words as opposed to others. With this mind, we can sometimes anticipate what a loved one is thinking and therefore is about to say. Our predictions rely on our past exposure of someone's speech content, and reflect the most likely scenario to occur. 
+###In this project, we will build an application with the main goal is to predict the next word of a sentence. In order to perform this task, we will build a linguisitic model based on three sources of sentences: newspapers, twitter, and blogs. This project will have 3 folds. Firstly, we will explore these datasets and perform exploratory data analysis in order to have a better grasp on our data. Secondly, we will create and test our language model in order to assess its reliability, and therefore its predicitve power. Finally, a web application will be built in which the user will be asked to enter an incomplete sentence, and we will predict the most likely option to complete this sentence. Then we will know for sure: can we predict what you are thinking of?  
+
+###First, let us import the dataset and our dependencies for this project
+
+```{r echo=TRUE}
+filename <- "swiftkey.zip"
+fileURL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+options(header=FALSE, stringsAsFactors=FALSE )
+if (!file.exists(filename)){
+download.file(fileURL, filename, method="curl")
+ }
+if (!file.exists("coursera_swiftkey")) { 
+unzip(filename) 
+ }
+
+# Loading the dependencies
+
+library(tm)
+library(wordcloud)
+library(ggplot2)
+library(dplyr)
+library(caTools)
+#library(NLP)
+#library(rJava)
+#library(RWeka)
+
+```
+
+## Exploratory Data Analysis
+###In this fisrt stage, we will look at three datasets individually in order to better understand the word distribution. Because our datasets composed of thousands of lines and that we are limited in our computing power, we will only take a subset of the entire dataset. In our case, we will aim for 10% of the entire dataset. This value was chosen after trial and error, and that is the maximum of data that we can process with our computing power. Our different subsets are created using a random selection of lines with our datasets.
+
+```{r echo=TRUE}
+
+#Coin flip
+    set.seed(233)
+    theta <- 0.1
+    #News
+    data_news <- readLines("final/en_US/en_US.news.txt")
+    N <- length(data_news)
+    flips <- rbinom(n=N, size = 1, prob = theta)
+    boolean_news <- flips =="1"
+    raw_news = data_news[boolean_news]
+    
+    #twitter
+    data_twitter <- readLines("final/en_US/en_US.twitter.txt")
+    N <- length(data_twitter)
+    flips <- rbinom(n=N, size = 1, prob = theta)
+    boolean_twitter <- flips =="1"
+    raw_twitter = data_twitter[boolean_twitter]
+    
+    #blogs
+    data_blogs <- readLines("final/en_US/en_US.blogs.txt")
+    N <- length(data_blogs)
+    flips <- rbinom(n=N, size = 1, prob = theta)
+    boolean_blogs <- flips =="1"
+    raw_blogs = data_blogs[boolean_blogs]
+  
+```
+
+###In this section, we proceed with basic preprocessing for NLP data. Our preprocessing steps include having our data in lower case, and removing punctuations, numbers, stopwords, and white spaces. The last step creates a clean dataset that we will use in our subsequent step.
+
+```{r echo=TRUE}
+    #Reading documents & Cleaning data
+  #news
+    raw_news <- data_news[boolean_news]
+    cor_news <- Corpus(VectorSource(raw_news))
+    cor_news <- tm_map(cor_news, tolower)
+    cor_news <- tm_map(cor_news, removePunctuation)
+    cor_news <- tm_map(cor_news, removeNumbers)
+    clean_news <- tm_map(cor_news, removeWords, stopwords("english"))
+    clean_news <- tm_map(clean_news, stripWhitespace)
+    clean_news <- tm_map(cor_news, stripWhitespace)
+  #twitter
+    raw_twitter <- data_twitter[boolean_twitter]
+    cor_twitter <- Corpus(VectorSource(raw_twitter))
+    cor_twitter <- tm_map(cor_twitter, tolower)
+    cor_twitter <- tm_map(cor_twitter, removePunctuation)
+    cor_twitter <- tm_map(cor_twitter, removeNumbers)
+    clean_twitter <- tm_map(cor_twitter, removeWords, stopwords("english"))
+    clean_twitter <- tm_map(clean_twitter, stripWhitespace)
+    clean_twitter <- tm_map(cor_twitter, stripWhitespace)
+  #blogs
+    raw_blogs <- data_blogs[boolean_blogs]
+    cor_blogs <- Corpus(VectorSource(raw_blogs))
+    cor_blogs <- tm_map(cor_blogs, tolower)
+    cor_blogs <- tm_map(cor_blogs, removePunctuation)
+    cor_blogs <- tm_map(cor_blogs, removeNumbers)
+    clean_blogs <- tm_map(cor_blogs, removeWords, stopwords("english"))
+    clean_blogs <- tm_map(clean_blogs, stripWhitespace)
+    clean_blogs <- tm_map(cor_blogs, stripWhitespace)
+  
+```
+  
+###In this section, we create a Term Document Matrix and organize our data in such a way that our tokens are listed in descending order of its frequency in the sample data set. Below is also reported the number of lines and words for each data set.
+  
+```{r, echo=TRUE}
+  #Creating TermDocuments
+  #News
+    tdm_news <- TermDocumentMatrix(clean_news)
+    tdm1_news <- as.matrix(tdm_news)
+    termfrequency1_news <- sort(rowSums(as.matrix(tdm1_news)), decreasing = TRUE)
+    df_tdm1_news <- data.frame(word = names(termfrequency1_news),freq=termfrequency1_news)
+    gc()
+  #Twitter
+    tdm_twitter <- TermDocumentMatrix(clean_twitter)
+    tdm1_twitter <- as.matrix(tdm_twitter)
+    termfrequency1_twitter <- sort(rowSums(as.matrix(tdm1_twitter)), decreasing = TRUE)
+    df_tdm1_twitter <- data.frame(word = names(termfrequency1_twitter),freq=termfrequency1_twitter)
+    gc()
+  #News
+    tdm_blogs <- TermDocumentMatrix(clean_blogs)
+    tdm1_blogs <- as.matrix(tdm_blogs)
+    termfrequency1_blogs <- sort(rowSums(as.matrix(tdm1_blogs)), decreasing = TRUE)
+    df_tdm1_blogs <- data.frame(word = names(termfrequency1_blogs),freq=termfrequency1_blogs)
+    gc()
+    tdm_news
+    tdm_twitter
+    tdm_blogs
+```
+
+
+Then, we created three wordclouds reporting the most frequent words in each of our sample. All wordclouds are displayed below: 
+
+```{r, echo=TRUE}
+#Creating wordcloud and barplot for tdm1
+  par(mfrow=c(1,3))
+  #News
+  wordcloud(words = df_tdm1_news$word, freq = df_tdm1_news$freq,scale = c(2,0.5)  , max.words=150, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+  #Twitter
+  wordcloud(words = df_tdm1_twitter$word, freq = df_tdm1_twitter$freq, scale=c(2,0.5), max.words=150, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+  #blogs
+  wordcloud(words = df_tdm1_blogs$word, freq = df_tdm1_blogs$freq, scale=c(2,0.5), max.words=150, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+```  
+
+In order to visually show the quantity of the most frequent words, we built histograms reporting the 20 most frequent tokens for each data set. 
+
+```{r, echo=TRUE}  
+  par(mfrow=c(1,3))
+  #news
+  barplot(df_tdm1_news[1:20,]$freq, las = 2, names.arg = df_tdm1_news[1:20,]$word, col = "red", main = "Most Frequent Words (News)", ylab = "Word Frequencies", xlab = "Words", horiz = T)
+  #twitter
+  barplot(df_tdm1_twitter[1:20,]$freq, las = 2, names.arg = df_tdm1_twitter[1:20,]$word, col = "blue", main = "Most Frequent Words (Twitter)", xlab = "Words", horiz = T) 
+  #blogs
+  barplot(df_tdm1_blogs[1:20,]$freq, las = 2, names.arg = df_tdm1_blogs[1:20,]$word, col = "green",
+        main = "Most Frequent Words (Blogs)", xlab = "Words", horiz = T) 
+  
+```
+
+## Creation Of Our Language Model
+###Now that we have a better idea of the distribution of words by datasets, we will regroup our three datasets together in order to build our predictive model. In the next few lines of codes, we will "tokenize" our dataset in order to create one item per word. Once tokenized, we will apply our customized function to create uni-, bi-, tri-, and fourgrams. Considering that we are creating a predictive model, we will also create a validation and test set in order to verify the accuracy of our model. 
+
+```{r echo=TRUE}
+  
+  
+  # Concatenating all lines from the 3 sources together to get one dataset
+    samplelines <- c(raw_news, raw_blogs, raw_twitter)
+  
+  # Create the training, validation, and testing sets
+  # First let's create the test_data and first training set
+    set.seed(144)
+    samplelines = sample(samplelines)
+    train_idx = floor(length(samplelines) * 0.8)
+    test_idx = floor(length(samplelines) * 0.9)
+  
+    training_data = samplelines[1:train_idx]
+    valid_data = samplelines[(train_idx +1):test_idx]
+    testing_data = samplelines[(test_idx+1):length(samplelines)]
+    
+    
+  ### Function to tokenize our data
+  #### Tokenize the raw data and proceed to some preprocessing steps ####
+  tokenizer <- function(lines){
+    lines <- tolower(lines)
+    lines <- removePunctuation(lines)
+    lines <- removeNumbers(lines)
+    lines <- stripWhitespace(lines)
+    lines <- gsub("'", "'", lines)
+    lines <- gsub("[.!?]$|[.!?] |$", " ''split'' ", lines)
+    tokens <- unlist(strsplit(lines, "[^a-z']"))
+    tokens <- tokens[tokens != ""]
+    return(tokens)
+  }
+  #### End of function ####
+    
+    
+  #### Function to create Ngram dataframe ####
+  # data = samplelines; ngram = Ngram you want to create: "bigrams", "trigrams", "fourgrams" 
+  Ngram_creator = function(data, ngram){
+	  
+    tokens1 <- tokenizer(data)
+	  
+    # Creating list of the second, third, and fourth token for the corpus 
+	  tokens2 <- c(tokens1[-1], ".")
+  	tokens3 <- c(tokens2[-1], ".")
+  	tokens4 <- c(tokens3[-1], ".")
+	
+  	# Creating unigrams, bigrams, trigrams 
+	  if (ngram == "unigrams"){
+	  ngrams = tokens1
+	  }
+  	if (ngram == "bigrams"){
+  	ngrams = paste(tokens1, tokens2)
+	    }
+  	if (ngram == "trigrams"){
+  	ngrams = paste(tokens1, tokens2, tokens3)
+  	}
+  	if (ngram == "fourgrams"){
+  	ngrams = paste(tokens1, tokens2, tokens3, tokens4)
+  	}
+  	return(ngrams)
+    }
+  #### End function ####
+   
+    
+# Applying the Ngram function
+  # training data
+  train_unigrams = Ngram_creator(training_data, "unigrams")
+  train_bigrams = Ngram_creator(training_data, "bigrams")
+  train_trigrams = Ngram_creator(training_data, "trigrams")
+  train_fourgrams = Ngram_creator(training_data, "fourgrams")
+  # validation data
+  valid_unigrams = Ngram_creator(valid_data, "unigrams")
+  valid_bigrams = Ngram_creator(valid_data, "bigrams")
+  valid_trigrams = Ngram_creator(valid_data, "trigrams")
+  valid_fourgrams = Ngram_creator(valid_data, "fourgrams")
+  # testing data
+  testing_unigrams = Ngram_creator(testing_data, "unigrams")
+  testing_bigrams = Ngram_creator(testing_data, "bigrams")
+  testing_trigrams = Ngram_creator(testing_data, "trigrams")
+  testing_fourgrams = Ngram_creator(testing_data, "fourgrams")
+  
+```
+  
+
+### In the next step, our training dataset will be processed in such a way to compile the frequency of each NGram, as well as identifying the subcomponents of each NGram. For example, for each fourgram, we will create a column highlighting the trigram (i.e., [(n-3), (n-2), (n-1)]), bigram (i.e., [(n-2), (n-1)]), unigram (i.e., [(n-1)]), and last word (i.e., target word n). These subcomponents will become crucial for creating our model in a later stage. 
+
+### Also, we will be removing any NGrams with the frequency of one. The only reason to perform this step is to reduce our computing demand. If we had access to greater computing power, we would leave these NGrams in our dataset. It is worth mentioning that the two "for loops" involved in the creation of our NGrams are computationally very expensive, and that is the main motivation from removing NGrams with a frequency of one. These loops could take more than 12 hours each depending on your RAM memory.
+
+```{r echo=TRUE}
+
+  ###### For processing a specific dataset at one time #####
+  unigrams = train_unigrams
+  bigrams = train_bigrams
+  trigrams = train_trigrams
+  fourgrams = train_fourgrams
+  
+  # Splitting each N-gram into multiple single units 
+  unigrams = unigrams[!grepl("''split''", unigrams)]
+  bigrams = bigrams[!grepl("''split''", bigrams)]
+  trigrams = trigrams[!grepl("''split''", trigrams)]
+  fourgrams = fourgrams[!grepl("''split''", fourgrams)]
+  
+  # Create a table for trigrams and bigrams
+  fourgrams = sort(table(fourgrams), decreasing = TRUE)
+  trigrams = sort(table(trigrams), decreasing = TRUE)
+  bigrams = sort(table(bigrams), decreasing = TRUE)
+  unigrams = sort(table(unigrams), decreasing = TRUE)
+  
+  # Transform the table into a dataframe
+  fourgrams = as.data.frame(fourgrams)
+  trigrams = as.data.frame(trigrams)
+  bigrams = as.data.frame(bigrams)
+  unigrams = as.data.frame(unigrams)
+  
+  # Removing all trigrams/bigrams that have a frequency of 1
+  fourgrams = fourgrams[fourgrams$Freq !=1,]
+  trigrams = trigrams[trigrams$Freq !=1,]
+  bigrams = bigrams[bigrams$Freq !=1,]
+  
+  
+  # Break down the n-grams into single words
+  fourgrams$fourgrams = as.character(fourgrams$fourgrams)
+  fourgrams$four_split = strsplit(fourgrams$fourgrams, split = " ")
+  trigrams$trigrams = as.character(trigrams$trigrams)
+  trigrams$trig_split = strsplit(trigrams$trigrams, split = " ")
+  bigrams$bigrams = as.character(bigrams$bigrams)
+  bigrams$big_split = strsplit(bigrams$bigrams, split = " ")
+  
+  
+  # Adding the column with the last word, trigram, bigram, and unigram for our fourgrams in preparation for our back-off model
+  for (i in 1:nrow(fourgrams)){
+    fourgrams$trigrams[i] = paste(fourgrams$four_split[[i]][1], fourgrams$four_split[[i]][2], fourgrams$four_split[[i]][3])
+    fourgrams$bigrams[i] = paste(fourgrams$four_split[[i]][2], fourgrams$four_split[[i]][3])
+    fourgrams$unigrams[i] = fourgrams$four_split[[i]][3]
+    fourgrams$last_word[i] = fourgrams$four_split[[i]][4]
+  }
+  fourgrams = fourgrams[c("fourgrams", "Freq", "trigrams", "bigrams", "unigrams", "last_word")]
+  write.csv(fourgrams, "fourgrams.csv")
+
+  
+  # Adding the column with the last word, bigram, and unigram for our trigrams in preparation for our back-off model  
+  for (i in 1:nrow(trigrams)){
+    trigrams$bigrams[i] = paste(trigrams$trig_split[[i]][1], trigrams$trig_split[[i]][2])
+    trigrams$unigrams[i] = trigrams$trig_split[[i]][2]
+    trigrams$last_word[i] = trigrams$trig_split[[i]][3]
+    print(i)
+  }
+  trigrams = trigrams[c("trigrams", "Freq", "bigrams","unigrams","last_word")]
+  write.csv(trigrams, "trigrams.csv")
+  
+
+  # Adding the column with the last word and unigram for our bigrams in preparation for our back-off model  
+  for (i in 1:nrow(bigrams)){
+    bigrams$unigrams[i] = bigrams$big_split[[i]][1]
+    bigrams$last_word[i] = bigrams$big_split[[i]][2]
+  }
+  bigrams = bigrams[c("bigrams", "Freq", "unigrams", "last_word")]
+  write.csv(bigrams, "bigrams.csv")  
+  
+  
+```
+
+### Now that we have all of our data in its final format before the modeling step, let us look at the distribution of our Ngrams using a wordcloud. We could compare these wordclouds with the ones previously generated to see how the are similar/different. Since the latter regrouped all of our data, we are more confident that they are more representative of our overall dataset (duh!) and therefore could be more appropriate for builiding our predictive model.
+
+```{r echo=TRUE}
+
+  # Building wordclouds for each N-Gram
+  wordcloud(words = fourgrams$fourgrams, freq = fourgrams$Freq, scale = c(2,0.5)  , max.words=200, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+  
+  wordcloud(words = trigrams$trigrams, freq = trigrams$Freq, scale = c(2,0.5)  , max.words=200, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+    
+  wordcloud(words = bigrams$bigrams, freq = bigrams$Freq, scale = c(2,0.5)  , max.words=200, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+  
+  wordcloud(words = unigrams$unigrams, freq = unigrams$Freq, scale = c(2,0.5)  , max.words=200, 
+          min.freq = 0 ,random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+  
+  # Showing the frequency of the 20 most popular N-Grams
+  #par(mfrow=c(1,3))
+  #news
+  barplot(fourgrams[1:20,]$Freq, las = 2, names.arg = fourgrams[1:20,]$fourgrams, col = "red", main = "Most Frequent Fourgrams", xlab = "Frequency", horiz = T)
+  #twitter
+  barplot(trigrams[1:20,]$Freq, las = 2, names.arg = trigrams[1:20,]$trigrams, col = "blue", main = "Most Frequent Trigrams", xlab = "Frequency", horiz = T) 
+  #blogs
+  barplot(bigrams[1:20,]$Freq, las = 2, names.arg = bigrams[1:20,]$bigrams, col = "green",
+        main = "Most Frequent Bigrams", xlab = "Frequency", horiz = T) 
+```
+
+### Before tackling our model, let us format the data from our validation and testing sets. These two datasets will undergo the same preprocessing steps as our training set. 
+
+```{r, echo=TRUE}
+### For validation and testing set ####
+  # We will remove the units with the "split" character
+  valid_unigrams = valid_unigrams[!grepl("''split''", valid_unigrams)]
+  valid_bigrams = valid_bigrams[!grepl("''split''", valid_bigrams)]
+  valid_trigrams = valid_trigrams[!grepl("''split''", valid_trigrams)]
+  valid_fourgrams = valid_fourgrams[!grepl("''split''", valid_fourgrams)]
+  
+  testing_unigrams = testing_unigrams[!grepl("''split''", testing_unigrams)]
+  testing_bigrams = testing_bigrams[!grepl("''split''", testing_bigrams)]
+  testing_trigrams = testing_trigrams[!grepl("''split''", testing_trigrams)]
+  testing_fourgrams = testing_fourgrams[!grepl("''split''", testing_fourgrams)]
+  
+  # Create a table for trigrams and bigrams
+  valid_fourgrams = sort(table(valid_fourgrams), decreasing = TRUE)
+  valid_trigrams = sort(table(valid_trigrams), decreasing = TRUE)
+  valid_bigrams = sort(table(valid_bigrams), decreasing = TRUE)
+  valid_unigrams = sort(table(valid_unigrams), decreasing = TRUE)
+  
+  testing_fourgrams = sort(table(testing_fourgrams), decreasing = TRUE)
+  testing_trigrams = sort(table(testing_trigrams), decreasing = TRUE)
+  testing_bigrams = sort(table(testing_bigrams), decreasing = TRUE)
+  testing_unigrams = sort(table(testing_unigrams), decreasing = TRUE)
+  
+  # Transform the table into a dataframe
+  valid_fourgrams = as.data.frame(valid_fourgrams)
+  valid_trigrams = as.data.frame(valid_trigrams)
+  valid_bigrams = as.data.frame(valid_bigrams)
+  testing_fourgrams = as.data.frame(testing_fourgrams)
+  testing_trigrams = as.data.frame(testing_trigrams)
+  testing_bigrams = as.data.frame(testing_bigrams)
+  ###
+
+  # Break the fourgrams in a column of trigrams and a column with the last word for VALIDATION data
+  valid_fourgrams$valid_fourgrams = as.character(valid_fourgrams$valid_fourgrams)
+  valid_fourgrams$strsplit = strsplit(valid_fourgrams$valid_fourgrams, split = " ")
+  
+  for (i in 1:nrow(valid_fourgrams)){
+    valid_fourgrams$trigrams[i] = paste(valid_fourgrams$strsplit[[i]][1], valid_fourgrams$strsplit[[i]][2], valid_fourgrams$strsplit[[i]][3])
+    valid_fourgrams$last_word[i] = valid_fourgrams$strsplit[[i]][4]  
+  }
+  valid_fourgrams = valid_fourgrams[c("valid_fourgrams","Freq", "trigrams", "last_word")]
+  write.csv(valid_fourgrams, "valid_fourgrams.csv")
+
+  # Break the fourgrams in a column of trigrams and a column with the last word for VALIDATION data
+  testing_fourgrams$testing_fourgrams = as.character(testing_fourgrams$testing_fourgrams)
+  testing_fourgrams$strsplit = strsplit(testing_fourgrams$testing_fourgrams, split = " ")
+  
+  for (i in 1:nrow(testing_fourgrams)){
+    testing_fourgrams$trigrams[i] = paste(testing_fourgrams$strsplit[[i]][1], testing_fourgrams$strsplit[[i]][2], testing_fourgrams$strsplit[[i]][3])
+    testing_fourgrams$last_word[i] = testing_fourgrams$strsplit[[i]][4]
+  }
+  testing_fourgrams = testing_fourgrams[c("testing_fourgrams", "Freq", "trigrams","last_word")]
+  write.csv(testing_fourgrams,"testing_fourgrams.csv")
+```
+
+### In the following section, we will develop a function to predict the last word of a fourgram. Hence it will consider the input, the test sample, and compare it against the training set to retrieve the word with the highest probability associated with this specifc trigram given as a test sample. To take into account the fact that a test sample could be absent from the training sample,  
+
+
+# Prediction Of The Next Word: How Good Are We with an NGram?
+### The next part contains the core of our model. Our model is based on the Katz Back-Off model (KBO). The KBO model relies on the probability mass associated for our corpus. Hence for each observed NGram in our corpus, a probability is assigned according to its maximum likelihood estimate that is linked with its observed frequency. In other words, the more frequent is a NGram, the greater its probability of being observed. Considering that we are going to approach our model by looking at fourgrams, we will calculate the maximum likelihood estimate of each fourgram.
+####P(4-gram) = p(w(i) | w-3, w-2, w-1) / p(w | w-2, w-1)
+
+### However a question may arise: what do we do if we are asked to evaluate a previously unobserved fourgram? In order to answer this question, we will use the discounting probability approach where a certain amount of the probability mass is removed from the probability mass of the observed fourgrams, and then is redistributed for the unobserved fourgrams. To do so, we introduce a parameter C, which a value between 0 and 1. This value is then subtracted from the weighted frequency of each fourgram. The difference between the sum of the overall probabilities for a specific trigram and the sum of the modified probabilities of the same trigram gives you the discounted probability to be redistributed to your unobserved fourgrams. 
+####P(modified p(n)) = P(w(i) | w-3, w-2, w-1) / p(w | w-2, w-1) - C for each i, where i=1 to n
+####Discounted Probability = sum(P(w(i))) - sum(P(modified p(n)))
+
+###The discounted probability is distributed according to the probability associated with the count of bigrams divided by the count of the unigrams for this particular unobserved fourgram. This resulting probability is then multiplied by the discounted probability previously calculated and divided by a normalizing term. 
+
+###The function "probability_words" is perfomring this calculation accordingly and it generates the resulting probability of observing a particular fourgram. Our function accepts 4 parameters:
+    input: an incomplete sentence for which we want to predict the next word
+    alpha: parameter C to account for the amount of discounting
+    num_alternatives: Let you specify the number of outputs you would want to see. If your parameter is higher than the amount of possibilities, the function will automatically return all outputs.
+    
+###N.B.: It is worth mentioning that this function takes into account not only fourgrams. If a fourgram (w-3,w-2,w-1,w) and its associated trigrams (w-2,w-1,w) are not found, then the function will consider the trigram, and perform the same analysis as if it was a trigram. And again, if the trigram and associated bigrams are not found, then, a bigram analysis will be done, and so on.
+
+```{r, echo=TRUE}
+  
+# Function to predict the potential next word(s). It takes three arguments: 
+#     input: a trigram
+#     alpha: amount of discount to consider
+### This function should be optimized soon ###
+
+probability_words = function(input, alpha=0.5){   
+    
+    # Split the input into its components
+    input_split = strsplit(input, " ")
+    input_trig = paste(input_split[[1]][1], input_split[[1]][2], input_split[[1]][3])
+    input_big = paste(input_split[[1]][2], input_split[[1]][3])
+    input_uni = input_split[[1]][1]
+    input_last_word = input_split[[1]][4]
+    input_big_w1 = paste(input_split[[1]][2], input_split[[1]][3])
+    input_big_w = paste(input_split[[1]][3], input_split[[1]][4])
+    input_uni_w = input_split[[1]][3]
+    input_trig_unobs = paste(input_split[[1]][2], input_split[[1]][3], input_split[[1]][4]) 
+    input_big_unobs = paste(input_split[[1]][3], input_split[[1]][4])
+    input_uni_unobs = input_split[[1]][4]
+  
+    # For OBSERVED fourgrams
+    # Creating a sample of the possible choices for this trigram
+    if (input %in% fourgrams$fourgrams){ 
+        sample_data = fourgrams[fourgrams$trigrams == input_trig,]
+      
+        # Creating a new  column for the discounted counts
+        sample_data$trig_disc = sample_data$Freq - alpha    
+        
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data$Freq)
+      
+        # Extracting the new discounted probability for observed words
+        sample_data$disc_prob = sample_data$trig_disc/sumW_1W_2
+      
+        #print(sample_data$last_word[1])
+        probability = sample_data[sample_data$fourgrams == input,]$disc_prob
+        prediction = data.frame(input, probability)
+        return(prediction)
+    } 
+   
+    # For UNOBSERVED fourgrams
+    # Don't have the fourgram, but have the preceding trigram AND have the actual trigram -> so we can get the discounted prob 
+    # from the preceding trigram and get the prob of the the actual trigram
+    else if (!(input %in% fourgrams$fourgrams) && (input_trig %in% fourgrams$trigrams) && (input_trig_unobs %in% trigrams$trigrams)) {
+        # First, calculate the discounted probability
+        sample_data = fourgrams[fourgrams$trigrams == input_trig,]
+        # Creating a new  column for the discounted counts
+        sample_data$trig_disc = sample_data$Freq - alpha    
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data$Freq)
+        # Extracting the new discounted probability for observed words
+        sample_data$disc_prob = sample_data$trig_disc/sumW_1W_2
+        # subtracting the sum of the overall discounted probability to get the residual -> gamma
+        gamma = 1 - sum(sample_data$disc_prob)
+        # Extracting my sample dataset
+        sample_data_unobs = trigrams[trigrams$bigrams == input_big_w1,]
+        # Creating a new  column for the discounted counts
+        sample_data_unobs$trig_disc = sample_data_unobs$Freq - alpha    
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data_unobs$Freq)
+        # Extracting the new discounted probability for observed words
+        sample_data_unobs$disc_prob = sample_data_unobs$trig_disc/sumW_1W_2
+        probability = gamma * sample_data_unobs[sample_data_unobs$trigrams == input_trig_unobs,]$disc_prob
+        prediction = data.frame(input, probability)
+        return(prediction)   
+    }
+      
+    # Don't have the fourgram nor the associated trigram, then a trigram analysis is being performed
+    else if (!(input %in% fourgrams$fourgrams) && !(input_trig %in% fourgrams$trigrams) && (input_trig_unobs %in% trigrams$trigrams) && (input_big_w1 %in% trigrams$bigrams)){
+        sample_data = trigrams[trigrams$bigrams == input_big_w1,]
+        sample_data$trig_disc = sample_data$Freq - alpha 
+        sumW_1W_2 = sum(sample_data$Freq)
+        sample_data$disc_prob = sample_data$trig_disc/sumW_1W_2
+        probability = sample_data[sample_data$trigrams == input_trig_unobs,]$disc_prob
+        prediction = data.frame(input, probability)
+        return(prediction)
+    }
+    
+    # Don't have the fourgram, but have the associated trigram. However the actual trigram is missing as well, so therefore we need to look at the bigram level
+    # Here, we can get the discounted probability from the fourgram, trigram and bigram.
+    else if (!(input %in% fourgrams$fourgrams) &&  (input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% trigrams$trigrams) && !(input_big_w %in% bigrams$bigrams) && (input_big_w1 %in% trigrams$bigrams) && (input_uni_w %in% bigrams$unigrams)){
+        sample_data = trigrams[trigrams$bigrams == input_big_w1,]
+        sample_data$trig_disc = sample_data$Freq - alpha 
+        sumW_1W_2 = sum(sample_data$Freq)
+        sample_data$disc_prob = sample_data$trig_disc / sumW_1W_2 
+        gamma = 1 - sum(sample_data$disc_prob)
+        
+        # Extracting my sample dataset
+        sample_data_unobs = bigrams[bigrams$unigrams == input_uni_w,]
+        sample_data_unobs$trig_prob = sample_data_unobs$Freq - alpha
+        sumAll = sum(sample_data_unobs$Freq)
+        sample_data_unobs$disc_prob = sample_data_unobs$trig_prob / sumAll
+        gamma2 = 1 - sum(sample_data_unobs$disc_prob)
+        
+        sample_data2 = unigrams
+        sample_data2$trig_disc = sample_data2$Freq - alpha
+        sumAll2 = sum(sample_data2$Freq)
+        sample_data2$disc_prob = sample_data2$trig_disc / sumAll2
+        gamma3 = 1 - sum(sample_data2$disc_prob)
+        probability = gamma * gamma2 * gamma3
+        prediction = data.frame(input, probability)
+        return(prediction)   
+    }
+      
+    # Don't haven the fourgram, and trigram. Therefore we extract the discounted probability at the bigram level, and multiply it with our unigram probability
+    else if (!(input %in% fourgrams$fourgrams) && !(input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% bigrams$bigrams) && !(input_big_w1 %in% trigrams$bigrams) && !(input_uni_w %in% bigrams$unigrams)){
+      sample_data = bigrams[bigrams$unigrams == input_uni_w,]
+      sample_data$trig_disc = sample_data$Freq - alpha 
+      sumW_1W_2 = sum(sample_data$Freq)
+      sample_data$disc_prob = sample_data$trig_disc / sumW_1W_2 
+      gamma = 1 - sum(sample_data$disc_prob)
+      
+      # Extracting my sample dataset
+        sample_data_unobs = unigrams[unigrams$unigrams == input_uni_unobs,]
+        sumAll = sum(unigrams$Freq)
+        prob_uni = sample_data_unobs$Freq/sumAll
+        probability = gamma * prob_uni
+        prediction = data.frame(input, probability)
+        return(prediction)   
+    }
+    
+    # Don't have the fourgram, trigram, associated trigram, and associated bigram, but have the actual bigram
+    else if (!(input %in% fourgrams$fourgrams) && !(input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% trigrams$trigrams) && !(input_big_w1 %in% trigrams$bigrams) && (input_big_w %in% bigrams$bigrams)){
+      sample_data = bigrams[bigrams$unigrams == input_uni_w,]
+      sample_data$trig_disc = sample_data$Freq - alpha
+      sumAll = sum(sample_data$Freq)
+      sample_data$disc_prob = sample_data$trig_disc / sumAll
+      gamma = 1 - sum(sample_data$disc_prob)
+      probability = sample_data[sample_data$bigrams == input_big_w,]$disc_prob
+      prediction = data.frame(input, probability)
+      return(prediction)   
+    }
+    
+    # Don't have the fourgram, associated trigram, trigram, but have the associated bigram. Here we can get the discounted probability from the fourgram, and trigram level
+    else if (!(input %in% fourgrams$fourgrams) && !(input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% trigrams$trigrams) && (input_big_w1 %in% trigrams$bigrams)){
+      sample_data = trigrams[trigrams$bigrams == input_big_w1,]
+      sample_data$trig_disc = sample_data$Freq - alpha
+      sumAll = sum(sample_data$Freq)
+      sample_data$disc_prob = sample_data$trig_disc / sumAll
+      gamma = 1 - sum(sample_data$disc_prob)
+      
+      sample_data2 = bigrams[bigrams$unigrams == input_uni_w,]
+      sample_data2$trig_disc = sample_data2$Freq - alpha
+      sumAll2 = sum(sample_data2$Freq)
+      sample_data2$disc_prob = sample_data2$trig_disc / sumAll2
+      gamma2 = 1 - sum(sample_data2$disc_prob)
+      
+      sample_data3 = unigrams
+      sample_data3$trig_disc = sample_data3$Freq - alpha
+      sumAll3 = sum(sample_data3$Freq)
+      sample_data3$disc_prob = sample_data3$trig_disc / sumAll3
+      prob_uni = sample_data3[sample_data3$unigrams == input_uni_unobs,]$disc_prob
+      probability = prob_uni * gamma * gamma2 
+      prediction = data.frame(input, probability)
+      return(prediction)
+    }
+    
+    # Don't have the fourgram, associated trigram, trigram, associated bigram, but thave the actual bigram. 
+    else if (!(input %in% fourgrams$fourgrams) && !(input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% trigrams$trigrams) && !(input_big_w1 %in% trigrams$bigrams) && !(input_big_w %in% bigrams$bigrams) && (input_uni_w %in% bigrams$unigrams)){
+      sample_data = bigrams[bigrams$unigrams == input_uni_w,]
+      sample_data$trig_disc = sample_data$Freq - alpha
+      sumAll = sum(sample_data$Freq)
+      sample_data$disc_prob = sample_data$trig_disc / sumAll
+      gamma = 1 - sum(sample_data$disc_prob)
+      
+      sample_data2 = unigrams
+      sample_data2$trig_disc = sample_data2$Freq - alpha
+      sumAll2 = sum(sample_data2$Freq)
+      sample_data2$disc_prob = sample_data2$trig_disc / sumAll2
+      gamma2 = 1 - sum(sample_data2$disc_prob)
+      prob_uni = sample_data2[sample_data2$unigrams == input_uni_unobs,]$disc_prob
+      probability = gamma * gamma2 * prob_uni
+      prediction = data.frame(input, probability)
+      return(prediction)
+    }
+    
+    # Don't have the fourgram, but have the associated trigram. However, we don't have the actual trigram, but we have the actual bigram 
+    else if (!(input %in% fourgrams$fourgrams) && (input_trig %in% fourgrams$trigrams) && !(input_trig_unobs %in% trigrams$trigrams) && (input_big_w1 %in% trigrams$bigrams) && (input_big_w %in% bigrams$bigrams) && (input_uni_w %in% bigrams$unigrams)){
+      sample_data = fourgrams[fourgrams$trigrams == input_trig,]
+      sample_data$trig_disc = sample_data$Freq - alpha
+      sumAll = sum(sample_data$Freq)
+      sample_data$disc_prob = sample_data$trig_disc / sumAll
+      gamma = 1 - sum(sample_data$disc_prob)
+      
+      sample_data2 = trigrams[trigrams$bigrams == input_big,]
+      sample_data2$trig_disc = sample_data2$Freq - alpha
+      sumAll2 = sum(sample_data2$Freq)
+      sample_data2$disc_prob = sample_data2$trig_disc / sumAll2
+      gamma2 = 1 - sum(sample_data2$disc_prob)
+      
+      sample_data3 = bigrams[bigrams$unigrams == input_uni_w,]
+      sample_data3$trig_disc = sample_data3$Freq - alpha
+      sumAll3 = sum(sample_data3$Freq)
+      sample_data3$disc_prob = sample_data3$trig_disc / sumAll3
+      prob_uni = sample_data3[sample_data3$bigrams == input_big_unobs,]$disc_prob
+      probability = prob_uni * gamma * gamma2
+      prediction = data.frame(input, probability)
+      return(probability)
+      
+    }
+ }
+  
+#### END OF FUNCTION ####
+
+```
+
+###We will calculate the predicted probability for each fourgram of the validation set, and the data will be stored in the vector "prob" for further operations. Furthermore, we will calculate our accuracy score as well as the accuracy on the top3 prediction on the validation set. 
+
+
+```{r echo=TRUE}
+  
+  # The next few lines apply our probability function to the validation set and add a new column to the former.
+  probabilities = as.data.frame(sapply(valid_fourgrams$valid_fourgrams, FUN = probability_words))
+  probabilities = probabilities[2,]
+  probabilities = as.data.frame(t(probabilities))
+  valid_fourgrams = cbind(valid_fourgrams, probabilities)
+
+  
+  # Measure of perplexity for the validation set
+  perplexity = exp(-sum(log(valid_fourgrams$probabilities)) / nrow(valid_fourgrams))
+  
+ 
+  # Measure of accuracy for the validation set considering the top3 and top1 word predictions
+  
+  # First step is to verify if the first suggestion of the last word in the training set corresponds to the last word in the validation set
+  # Here we are adding a column reporting if each fourgram corresponds to the first fourgram in the training set 
+  for (i in 1:nrow(valid_fourgrams)){
+  
+   test_sample1 = valid_fourgrams$trigrams[i]
+  
+   test_sample2 = valid_fourgrams$last_word[i]
+  
+   if (!(test_sample1 %in% fourgrams$trigrams)){
+      valid_fourgrams$accuracy[i] = 0
+    } 
+   else {
+    train_sample = fourgrams[fourgrams$trigrams == test_sample1,]
+      if (train_sample$last_word[1] == test_sample2){
+        valid_fourgrams$accuracy[i] = 1
+      } 
+      else {
+        valid_fourgrams$accuracy[i] = 0
+      }  
+    }
+  }
+  
+  # The accuracy measure is calculated using the sum of the last word correct predictions divided by the number of unique n-grams
+  # It is important to mention that the accuracy will be equal to 0 if the last word in the training set doesn't correspond to the
+  # one with highest likelihood.
+  accuracy = round(sum(valid_fourgrams$accuracy)/nrow(valid_fourgrams),2)
+  accuracy
+  
+  #################################
+  
+  for (i in 1:nrow(valid_fourgrams)){
+  
+   test_sample1 = valid_fourgrams$trigrams[i]
+   test_sample2 = valid_fourgrams$last_word[i]
+  
+   if (!(test_sample1 %in% fourgrams$trigrams)){
+      valid_fourgrams$accuracy_top3[i] = 0
+    } 
+   else {
+    train_sample = fourgrams[fourgrams$trigrams == test_sample1,]
+      if ((nrow(train_sample) >=3) && (sum(train_sample$last_word[1:3] == test_sample2) != 0)){
+        valid_fourgrams$accuracy_top3[i] = 1
+      } 
+      else if ( (nrow(train_sample) < 3) && (sum(train_sample$last_word[nrow(train_sample)] == test_sample2) != 0)){
+        valid_fourgrams$accuracy_top3[i] = 1
+      }
+      else {
+        valid_fourgrams$accuracy_top3[i] = 0
+      }
+    }
+  }
+  
+  accuracy_top3 = round(sum(valid_fourgrams$accuracy_top3)/nrow(valid_fourgrams),2)
+  accuracy_top3
+  
+```
+
+Let us perform the same calculation for accuracy on the test set
+
+```{r echo=TRUE}  
+  # Getting the probability predictions for the test set
+  testing_fourgrams$prob = sapply(testing_fourgrams$trigrams, predict_words)
+  
+  # Getting the measure of perplexity
+  perplexity = exp(-sum(log(testing_fourgrams$prob)) / nrow(testing_fourgrams))
+  
+  # Getting the accuracy measure for the test set
+  for (i in 1:nrow(testing_fourgrams)){
+  
+   test_sample1 = testing_fourgrams$trigrams[i]
+  
+   test_sample2 = testing_fourgrams$last_word[i]
+  
+   if (!(test_sample1 %in% fourgrams$trigrams)){
+      testing_fourgrams$accuracy[i] = 0
+    } 
+   else {
+    train_sample = fourgrams[fourgrams$trigrams == test_sample1,]
+      if (train_sample$last_word[1] == test_sample2){
+        testing_fourgrams$accuracy[i] = 1
+      } 
+      else {
+        testing_fourgrams$accuracy[i] = 0
+      }  
+    }
+  }
+  write.csv(testing_fourgrams, "testing_fourgrams.csv")
+  
+  #### Accuracy for the first three words for test set
+  for (i in 1:nrow(testing_fourgrams)){
+  
+   test_sample1 = testing_fourgrams$trigrams[i]
+   test_sample2 = testing_fourgrams$last_word[i]
+  
+   if (!(test_sample1 %in% fourgrams$trigrams)){
+      testing_fourgrams$accuracy_top3[i] = 0
+    } 
+   else {
+    train_sample = fourgrams[fourgrams$trigrams == test_sample1,]
+      if ((nrow(train_sample) >=3) && (sum(train_sample$last_word[1:3] == test_sample2) != 0)){
+        testing_fourgrams$accuracy_top3[i] = 1
+      } 
+      else if ( (nrow(train_sample) < 3) && (sum(train_sample$last_word[nrow(train_sample)] == test_sample2) != 0)){
+        testing_fourgrams$accuracy_top3[i] = 1
+      }
+      else {
+        testing_fourgrams$accuracy_top3[i] = 0
+      }
+    }
+  }
+  write.csv(testing_fourgrams, "testing_fourgrams.csv")
+  
+  accuracy_test = round(sum(valid_fourgrams$accuracy)/nrow(valid_fourgrams),2)
+  accuracy_test
+
+
+```
+
+## Can We Predict The Next Word?
+### Finally, what we did before was to identify the probability of the last word within a sentence. Here we will do something a bit different: we will try to predict the next word within a sentence. We will use the model that we built before in order to predict the next word. This function will be used in the Shiny app built later.
+
+This function takes three arguments:
+  - input: the input sentence of three words
+  - alpha: discounting parameter
+  - num_alternatives: the number of alternatives ranked in order requested by the user. N.B.: If an user ask for more alternatives then they actually are, then the function will return its maximum number of possible choices.
+
+
+```{r echo=TRUE}
+#########################
+  predict_words = function(input, alpha, num_alternatives){   
+  
+    input_split = strsplit(input, " ")
+    input_trig = paste(input_split[[1]][1], input_split[[1]][2], input_split[[1]][3])
+    input_big = paste(input_split[[1]][2], input_split[[1]][3])
+    input_uni = input_split[[1]][3]
+    input_last_word = input_split[[1]][3]
+  
+    # Creating a sample of the possible choices for this trigram
+    if (input %in% fourgrams$trigrams){ 
+        sample_data = fourgrams[fourgrams$trigrams == input_trig,]
+      
+        # Creating a new  column for the discounted counts
+        sample_data$trig_disc = sample_data$Freq - alpha    
+        
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data$Freq)
+      
+        # Extracting the new discounted probability for observed words
+        sample_data$disc_prob = sample_data$trig_disc/sumW_1W_2
+      
+        #print(sample_data$last_word[1])
+        if (nrow(sample_data) >= num_alternatives){
+          pred_prob = sample_data$disc_prob[1:num_alternatives]
+          pred_word = sample_data$last_word[1:num_alternatives]
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)  
+        } else {
+          pred_prob = sample_data$disc_prob
+          pred_word = sample_data$last_word
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)
+          }
+    } 
+    else if (!(input %in% fourgrams$trigrams) && (input_big %in% trigrams$bigrams)) {
+        sample_data = trigrams[trigrams$bigrams == input_big,]
+          
+        # Creating a new  column for the discounted counts
+        sample_data$big_disc = sample_data$Freq - alpha    
+        
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data$Freq)
+      
+        # Extracting the new discounted probability for observed words
+        sample_data$disc_prob = sample_data$big_disc/sumW_1W_2
+        
+        #print(sample_data$last_word[1])
+        if (nrow(sample_data) >= num_alternatives){
+          pred_prob = sample_data$disc_prob[1:num_alternatives]
+          pred_word = sample_data$last_word[1:num_alternatives]
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)  
+        } else {
+          pred_prob = sample_data$disc_prob
+          pred_word = sample_data$last_word
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)
+          }
+    }
+    else if (!(input %in% fourgrams$trigrams) && !(input_big %in% trigrams$bigrams) && (input_uni %in% bigrams$unigrams)){
+        sample_data = bigrams[bigrams$unigrams == input_uni,]
+      
+        # Creating a new  column for the discounted counts
+        sample_data$uni_disc = sample_data$Freq - alpha    
+        
+        # Summing up the frequency
+        sumW_1W_2 = sum(sample_data$Freq)
+      
+        # Extracting the new discounted probability for observed words
+        sample_data$disc_prob = sample_data$uni_disc/sumW_1W_2
+        
+        #print(sample_data$last_word[1])
+        if (nrow(sample_data) >= num_alternatives){
+          pred_prob = sample_data$disc_prob[1:num_alternatives]
+          pred_word = sample_data$last_word[1:num_alternatives]
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)  
+        } else {
+          pred_prob = sample_data$disc_prob
+          pred_word = sample_data$last_word
+          prediction = data.frame(pred_word, pred_prob)
+          return(prediction)
+          }
+    }
+  }
+  
+```
+
