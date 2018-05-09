@@ -9,11 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-#INTRODUCTION
-### A question that has puzzled mankind is whether we will ever be able to read someone else's mind. Even though this question has a lot of ethical considerations that needs to be addressed, it is still an interesting question on a scientific point of view. Indeed, this ability could be very benificial for patients in coma, for whom it has been shown that they are still reactive to their environment. But on a more simplistic way, can we have a conversation with a friend and predict what is the next thing that will be said? Our personality contributes to how we are going the exchange with soemone. Furthermore, we may have a specific style of communication that is proper to us favoring some words as opposed to others. With this mind, we can sometimes anticipate what a loved one is thinking and therefore is about to say. Our predictions rely on our past exposure of someone's speech content, and reflect the most likely scenario to occur. 
+# Introduction
+A question that has puzzled mankind is whether we will ever be able to read someone else's mind. Even though this question has a lot of ethical considerations that needs to be addressed, it is still an interesting question on a scientific point of view. Indeed, this ability could be very benificial for patients in coma, for whom it has been shown that they are still reactive to their environment. But on a more simplistic way, can we have a conversation with a friend and predict what is the next thing that will be said? Our personality contributes to how we are going the exchange with soemone. Furthermore, we may have a specific style of communication that is proper to us favoring some words as opposed to others. With this mind, we can sometimes anticipate what a loved one is thinking and therefore is about to say. Our predictions rely on our past exposure of someone's speech content, and reflect the most likely scenario to occur. 
 ###In this project, we will build an application with the main goal is to predict the next word of a sentence. In order to perform this task, we will build a linguisitic model based on three sources of sentences: newspapers, twitter, and blogs. This project will have 3 folds. Firstly, we will explore these datasets and perform exploratory data analysis in order to have a better grasp on our data. Secondly, we will create and test our language model in order to assess its reliability, and therefore its predicitve power. Finally, a web application will be built in which the user will be asked to enter an incomplete sentence, and we will predict the most likely option to complete this sentence. Then we will know for sure: can we predict what you are thinking of?  
 
-###First, let us import the dataset and our dependencies for this project
+First, let us import the dataset and our dependencies for this project
 
 ```{r echo=TRUE}
 filename <- "swiftkey.zip"
@@ -40,7 +40,7 @@ library(caTools)
 ```
 
 ## Exploratory Data Analysis
-###In this fisrt stage, we will look at three datasets individually in order to better understand the word distribution. Because our datasets composed of thousands of lines and that we are limited in our computing power, we will only take a subset of the entire dataset. In our case, we will aim for 10% of the entire dataset. This value was chosen after trial and error, and that is the maximum of data that we can process with our computing power. Our different subsets are created using a random selection of lines with our datasets.
+In this fisrt stage, we will look at three datasets individually in order to better understand the word distribution. Because our datasets composed of thousands of lines and that we are limited in our computing power, we will only take a subset of the entire dataset. In our case, we will aim for 10% of the entire dataset. This value was chosen after trial and error, and that is the maximum of data that we can process with our computing power. Our different subsets are created using a random selection of lines with our datasets.
 
 ```{r echo=TRUE}
 
@@ -70,7 +70,7 @@ library(caTools)
   
 ```
 
-###In this section, we proceed with basic preprocessing for NLP data. Our preprocessing steps include having our data in lower case, and removing punctuations, numbers, stopwords, and white spaces. The last step creates a clean dataset that we will use in our subsequent step.
+In this section, we proceed with basic preprocessing for NLP data. Our preprocessing steps include having our data in lower case, and removing punctuations, numbers, stopwords, and white spaces. The last step creates a clean dataset that we will use in our subsequent step.
 
 ```{r echo=TRUE}
     #Reading documents & Cleaning data
@@ -104,7 +104,7 @@ library(caTools)
   
 ```
   
-###In this section, we create a Term Document Matrix and organize our data in such a way that our tokens are listed in descending order of its frequency in the sample data set. Below is also reported the number of lines and words for each data set.
+In this section, we create a Term Document Matrix and organize our data in such a way that our tokens are listed in descending order of its frequency in the sample data set. Below is also reported the number of lines and words for each data set.
   
 ```{r, echo=TRUE}
   #Creating TermDocuments
@@ -164,7 +164,7 @@ In order to visually show the quantity of the most frequent words, we built hist
 ```
 
 ## Creation Of Our Language Model
-###Now that we have a better idea of the distribution of words by datasets, we will regroup our three datasets together in order to build our predictive model. In the next few lines of codes, we will "tokenize" our dataset in order to create one item per word. Once tokenized, we will apply our customized function to create uni-, bi-, tri-, and fourgrams. Considering that we are creating a predictive model, we will also create a validation and test set in order to verify the accuracy of our model. 
+Now that we have a better idea of the distribution of words by datasets, we will regroup our three datasets together in order to build our predictive model. In the next few lines of codes, we will "tokenize" our dataset in order to create one item per word. Once tokenized, we will apply our customized function to create uni-, bi-, tri-, and fourgrams. Considering that we are creating a predictive model, we will also create a validation and test set in order to verify the accuracy of our model. 
 
 ```{r echo=TRUE}
   
@@ -249,9 +249,9 @@ In order to visually show the quantity of the most frequent words, we built hist
 ```
   
 
-### In the next step, our training dataset will be processed in such a way to compile the frequency of each NGram, as well as identifying the subcomponents of each NGram. For example, for each fourgram, we will create a column highlighting the trigram (i.e., [(n-3), (n-2), (n-1)]), bigram (i.e., [(n-2), (n-1)]), unigram (i.e., [(n-1)]), and last word (i.e., target word n). These subcomponents will become crucial for creating our model in a later stage. 
+In the next step, our training dataset will be processed in such a way to compile the frequency of each NGram, as well as identifying the subcomponents of each NGram. For example, for each fourgram, we will create a column highlighting the trigram (i.e., [(n-3), (n-2), (n-1)]), bigram (i.e., [(n-2), (n-1)]), unigram (i.e., [(n-1)]), and last word (i.e., target word n). These subcomponents will become crucial for creating our model in a later stage. 
 
-### Also, we will be removing any NGrams with the frequency of one. The only reason to perform this step is to reduce our computing demand. If we had access to greater computing power, we would leave these NGrams in our dataset. It is worth mentioning that the two "for loops" involved in the creation of our NGrams are computationally very expensive, and that is the main motivation from removing NGrams with a frequency of one. These loops could take more than 12 hours each depending on your RAM memory.
+Also, we will be removing any NGrams with the frequency of one. The only reason to perform this step is to reduce our computing demand. If we had access to greater computing power, we would leave these NGrams in our dataset. It is worth mentioning that the two "for loops" involved in the creation of our NGrams are computationally very expensive, and that is the main motivation from removing NGrams with a frequency of one. These loops could take more than 12 hours each depending on your RAM memory.
 
 ```{r echo=TRUE}
 
@@ -327,7 +327,7 @@ In order to visually show the quantity of the most frequent words, we built hist
   
 ```
 
-### Now that we have all of our data in its final format before the modeling step, let us look at the distribution of our Ngrams using a wordcloud. We could compare these wordclouds with the ones previously generated to see how the are similar/different. Since the latter regrouped all of our data, we are more confident that they are more representative of our overall dataset (duh!) and therefore could be more appropriate for builiding our predictive model.
+Now that we have all of our data in its final format before the modeling step, let us look at the distribution of our Ngrams using a wordcloud. We could compare these wordclouds with the ones previously generated to see how the are similar/different. Since the latter regrouped all of our data, we are more confident that they are more representative of our overall dataset (duh!) and therefore could be more appropriate for builiding our predictive model.
 
 ```{r echo=TRUE}
 
@@ -355,7 +355,7 @@ In order to visually show the quantity of the most frequent words, we built hist
         main = "Most Frequent Bigrams", xlab = "Frequency", horiz = T) 
 ```
 
-### Before tackling our model, let us format the data from our validation and testing sets. These two datasets will undergo the same preprocessing steps as our training set. 
+Before tackling our model, let us format the data from our validation and testing sets. These two datasets will undergo the same preprocessing steps as our training set. 
 
 ```{r, echo=TRUE}
 ### For validation and testing set ####
@@ -413,25 +413,25 @@ In order to visually show the quantity of the most frequent words, we built hist
   write.csv(testing_fourgrams,"testing_fourgrams.csv")
 ```
 
-### In the following section, we will develop a function to predict the last word of a fourgram. Hence it will consider the input, the test sample, and compare it against the training set to retrieve the word with the highest probability associated with this specifc trigram given as a test sample. To take into account the fact that a test sample could be absent from the training sample,  
+In the following section, we will develop a function to predict the last word of a fourgram. Hence it will consider the input, the test sample, and compare it against the training set to retrieve the word with the highest probability associated with this specifc trigram given as a test sample. To take into account the fact that a test sample could be absent from the training sample,  
 
 
 # Prediction Of The Next Word: How Good Are We with an NGram?
-### The next part contains the core of our model. Our model is based on the Katz Back-Off model (KBO). The KBO model relies on the probability mass associated for our corpus. Hence for each observed NGram in our corpus, a probability is assigned according to its maximum likelihood estimate that is linked with its observed frequency. In other words, the more frequent is a NGram, the greater its probability of being observed. Considering that we are going to approach our model by looking at fourgrams, we will calculate the maximum likelihood estimate of each fourgram.
+The next part contains the core of our model. Our model is based on the Katz Back-Off model (KBO). The KBO model relies on the probability mass associated for our corpus. Hence for each observed NGram in our corpus, a probability is assigned according to its maximum likelihood estimate that is linked with its observed frequency. In other words, the more frequent is a NGram, the greater its probability of being observed. Considering that we are going to approach our model by looking at fourgrams, we will calculate the maximum likelihood estimate of each fourgram.
 ####P(4-gram) = p(w(i) | w-3, w-2, w-1) / p(w | w-2, w-1)
 
-### However a question may arise: what do we do if we are asked to evaluate a previously unobserved fourgram? In order to answer this question, we will use the discounting probability approach where a certain amount of the probability mass is removed from the probability mass of the observed fourgrams, and then is redistributed for the unobserved fourgrams. To do so, we introduce a parameter C, which a value between 0 and 1. This value is then subtracted from the weighted frequency of each fourgram. The difference between the sum of the overall probabilities for a specific trigram and the sum of the modified probabilities of the same trigram gives you the discounted probability to be redistributed to your unobserved fourgrams. 
-####P(modified p(n)) = P(w(i) | w-3, w-2, w-1) / p(w | w-2, w-1) - C for each i, where i=1 to n
-####Discounted Probability = sum(P(w(i))) - sum(P(modified p(n)))
+However a question may arise: what do we do if we are asked to evaluate a previously unobserved fourgram? In order to answer this question, we will use the discounting probability approach where a certain amount of the probability mass is removed from the probability mass of the observed fourgrams, and then is redistributed for the unobserved fourgrams. To do so, we introduce a parameter C, which a value between 0 and 1. This value is then subtracted from the weighted frequency of each fourgram. The difference between the sum of the overall probabilities for a specific trigram and the sum of the modified probabilities of the same trigram gives you the discounted probability to be redistributed to your unobserved fourgrams. 
+	- P(modified p(n)) = P(w(i) | w-3, w-2, w-1) / p(w | w-2, w-1) - C for each i, where i=1 to n
+	- Discounted Probability = sum(P(w(i))) - sum(P(modified p(n)))
 
-###The discounted probability is distributed according to the probability associated with the count of bigrams divided by the count of the unigrams for this particular unobserved fourgram. This resulting probability is then multiplied by the discounted probability previously calculated and divided by a normalizing term. 
+The discounted probability is distributed according to the probability associated with the count of bigrams divided by the count of the unigrams for this particular unobserved fourgram. This resulting probability is then multiplied by the discounted probability previously calculated and divided by a normalizing term. 
 
-###The function "probability_words" is perfomring this calculation accordingly and it generates the resulting probability of observing a particular fourgram. Our function accepts 4 parameters:
-    input: an incomplete sentence for which we want to predict the next word
-    alpha: parameter C to account for the amount of discounting
-    num_alternatives: Let you specify the number of outputs you would want to see. If your parameter is higher than the amount of possibilities, the function will automatically return all outputs.
+The function "probability_words" is perfomring this calculation accordingly and it generates the resulting probability of observing a particular fourgram. Our function accepts 4 parameters:
+    - input: an incomplete sentence for which we want to predict the next word
+    - alpha: parameter C to account for the amount of discounting
+    - num_alternatives: Let you specify the number of outputs you would want to see. If your parameter is higher than the amount of possibilities, the function will automatically return all outputs.
     
-###N.B.: It is worth mentioning that this function takes into account not only fourgrams. If a fourgram (w-3,w-2,w-1,w) and its associated trigrams (w-2,w-1,w) are not found, then the function will consider the trigram, and perform the same analysis as if it was a trigram. And again, if the trigram and associated bigrams are not found, then, a bigram analysis will be done, and so on.
+N.B.: It is worth mentioning that this function takes into account not only fourgrams. If a fourgram (w-3,w-2,w-1,w) and its associated trigrams (w-2,w-1,w) are not found, then the function will consider the trigram, and perform the same analysis as if it was a trigram. And again, if the trigram and associated bigrams are not found, then, a bigram analysis will be done, and so on.
 
 ```{r, echo=TRUE}
   
@@ -641,7 +641,7 @@ probability_words = function(input, alpha=0.5){
 
 ```
 
-###We will calculate the predicted probability for each fourgram of the validation set, and the data will be stored in the vector "prob" for further operations. Furthermore, we will calculate our accuracy score as well as the accuracy on the top3 prediction on the validation set. 
+We will calculate the predicted probability for each fourgram of the validation set, and the data will be stored in the vector "prob" for further operations. Furthermore, we will calculate our accuracy score as well as the accuracy on the top3 prediction on the validation set. 
 
 
 ```{r echo=TRUE}
@@ -778,7 +778,7 @@ Let us perform the same calculation for accuracy on the test set
 ```
 
 ## Can We Predict The Next Word?
-### Finally, what we did before was to identify the probability of the last word within a sentence. Here we will do something a bit different: we will try to predict the next word within a sentence. We will use the model that we built before in order to predict the next word. This function will be used in the Shiny app built later.
+Finally, what we did before was to identify the probability of the last word within a sentence. Here we will do something a bit different: we will try to predict the next word within a sentence. We will use the model that we built before in order to predict the next word. This function will be used in the Shiny app built later.
 
 This function takes three arguments:
   - input: the input sentence of three words
