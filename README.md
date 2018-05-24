@@ -18,5 +18,5 @@ In this first stage, we will look at three datasets individually in order to bet
 
 Our code will have two majors goals: calculate the probability and predict the last word of an N-gram. In order to perform these steps, we built a language model using discounted probabilities based on a Katz Back-Off Model. All the explanations can be found in the R-Markdown. 
 
-**_N.B.: This work will give rise to a Shiny app that will be online shortly._** 
+Please try out my app by clicking here[https://jsprovost.shinyapps.io/WordPrediction_app/]
 
